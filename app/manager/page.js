@@ -61,5 +61,5 @@ export default function Manager(){
   </Shell>;
 }
 
-function Shell({children,authenticated=false,logout}){return <><header><Brand title="Manager Calendar" subtitle="Success On The Spectrum · Parsippany"/><nav className="manager-nav"><a href="/">Form</a>{authenticated&&<button className="link" onClick={logout}>Log out</button>}</nav></header>{children}</>}
+function Shell({children,authenticated=false,logout}){return <><header><Brand title="Manager Calendar" subtitle="Success On The Spectrum"/><nav className="manager-nav"><a href="/">Form</a>{authenticated&&<button className="link" onClick={logout}>Log out</button>}</nav></header>{children}</>}
 function Field({t,children}){return <label className="field"><b>{t}</b>{children}</label>}
