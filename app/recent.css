@@ -1,0 +1,3 @@
+.legend i.recent{background:#dc3038}
+.event.recent,.event.employee.recent,.event.parent.recent,.event.note.recent{color:#fff;background:#dc3038;border-color:#9f1520}
+.event.recent:hover{background:#c4242d}
