@@ -17,7 +17,7 @@ export default function Home(){
   async function submit(event){event.preventDefault();setBusy(true);setMessage('');const response=await fetch('/api/callouts',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(form)});const data=await response.json();setBusy(false);if(!response.ok)return setMessage(data.error);setMessage(`${data.created} PTO or leave date${data.created===1?'':'s'} submitted successfully.`);setForm(emptyForm)}
 
   return <>
-    <header><Brand subtitle="PTO & Leave Request Portal"/><nav className="portal-links"><a className="link" href="/calendar">Team calendar</a><a className="link" href="/manager">Manager calendar</a></nav></header>
+    <header><Brand subtitle="PTO & Leave Request Portal"/><nav className="portal-links"><a className="link" href="/calendar">Parsippany call-out calendar</a><a className="link" href="/manager">Manager calendar</a></nav></header>
     <section className="hero"><div><label>SUCCESS ON THE SPECTRUM</label><h1>Submit a PTO or leave request</h1><p>Employees can request PTO or report non-PTO time away for one or more dates.</p></div></section>
     <main><form className="card form" onSubmit={submit}>
       <Field label="Employee name"><input required autoComplete="name" placeholder="Enter your full name" value={form.name} onChange={e=>update({name:e.target.value})}/></Field>
