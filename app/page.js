@@ -81,7 +81,7 @@ export default function Home() {
       <header>
         <Brand subtitle="Parsippany PTO & Leave Request Portal" />
         <nav className="portal-links">
-          <a className="link" href="/calendar">Parsippany call-out calendar</a>
+          <a className="link" href="/calendar">Parsippany Call Out Calendar</a>
           <a className="link" href="/manager">Parsippany Manager Calendar</a>
         </nav>
       </header>
