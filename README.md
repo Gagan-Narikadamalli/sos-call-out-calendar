@@ -16,3 +16,9 @@ Import this folder into Vercel, connect a Postgres database, and add `DATABASE_U
 
 Public form: `/`  
 Parsippany Manager Calendar: `/manager`
+
+## Request and calendar behavior
+
+Employees can submit PTO, 1/2 Day PTO, or Non-PTO / Out. Full-day and half-day PTO dates must be at least two calendar days after today in New Jersey. A reason is optional for PTO and required for Non-PTO / Out.
+
+Managers can edit existing Called Out and Sick Leave records while keeping their original request type. The team calendar remains read-only.
