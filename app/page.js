@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Brand from './components/Brand';
+import { apiRequest } from '../lib/client-api';
+import { earliestAdvanceDate } from '../lib/validate';
 
 const EMPTY_FORM = {
   submitter_type: 'Employee',
@@ -23,7 +25,7 @@ export default function Home() {
 
   const minimumPtoDate = getMinimumPtoDate();
   const reasonRequired = form.request_type === 'Non-PTO / Out';
-  const dateMinimum = form.request_type === 'PTO' || request_type === '1/2 Day PTO' ? minimumPtoDate : undefined;
+  const dateMinimum = form.request_type === 'PTO' || form.request_type === '1/2 Day PTO' ? minimumPtoDate : undefined;
 
   function updateForm(changes) {
     setForm((current) => ({ ...current, ...changes }));
@@ -58,37 +60,35 @@ export default function Home() {
     setBusy(true);
     setMessage('');
 
-    const response = await fetch('/api/callouts', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    const data = await response.json();
-
-    setBusy(false);
-    if (!response.ok) {
-      setMessage(data.error);
-      return;
+    try {
+      const data = await apiRequest('/api/callouts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const suffix = data.created === 1 ? '' : 's';
+      setMessage(`${data.created} PTO or leave date${suffix} submitted successfully.`);
+      setForm(EMPTY_FORM);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
     }
-
-    const suffix = data.created === 1 ? '' : 's';
-    setMessage(`${data.created} PTO or leave date${suffix} submitted successfully.`);
-    setForm(EMPTY_FORM);
   }
 
   return (
     <>
       <header>
-        <Brand subtitle="PTO & Leave Request Portal" />
+        <Brand subtitle="Parsippany PTO & Leave Request Portal" />
         <nav className="portal-links">
           <a className="link" href="/calendar">Parsippany call-out calendar</a>
-          <a className="link" href="/manager">Manager calendar</a>
+          <a className="link" href="/manager">Parsippany Manager Calendar</a>
         </nav>
       </header>
 
       <section className="hero">
         <div>
-          <label>SUCCESS ON THE SPECTRUM</label>
+          <label>SUCCESS ON THE SPECTRUM · PARSIPPANY</label>
           <h1>Submit a PTO or leave request</h1>
           <p>Employees can request PTO or report non-PTO time away for one or more dates.</p>
         </div>
@@ -245,14 +245,7 @@ export default function Home() {
 }
 
 function getMinimumPtoDate() {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  date.setDate(date.getDate() + 2);
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return earliestAdvanceDate();
 }
 
 function Field({ label, children }) {
