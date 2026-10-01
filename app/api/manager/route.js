@@ -96,22 +96,24 @@ async function handleDELETE(req){
   await ensureRecurrenceExceptions(sql);
   const result=await sql.begin(async transaction=>{
     const recurrenceRows=await transaction`
-      select distinct recurrence_id
-      from calendar_notes
-      where recurrence_id is not null
-        and event_date>=${start}
-        and event_date<=${end}
+      select distinct r.id as recurrence_id
+      from note_recurrences r
+      cross join generate_series(${start}::date,${end}::date,interval '1 day') as day
+      where day::date>=r.start_date
+        and (r.end_date is null or day::date<=r.end_date)
+        and extract(dow from day)::int=any(string_to_array(r.weekdays,',')::int[])
     `;
 
-    // Cleanup must permanently hide recurring occurrences in the selected range,
-    // otherwise the recurrence generator would create them again on the next load.
+    // Record every matching recurrence date in the cleanup window, including
+    // occurrences that have not yet been materialized in calendar_notes.
     await transaction`
       insert into note_recurrence_exceptions(recurrence_id,event_date)
-      select recurrence_id,event_date
-      from calendar_notes
-      where recurrence_id is not null
-        and event_date>=${start}
-        and event_date<=${end}
+      select r.id,day::date
+      from note_recurrences r
+      cross join generate_series(${start}::date,${end}::date,interval '1 day') as day
+      where day::date>=r.start_date
+        and (r.end_date is null or day::date<=r.end_date)
+        and extract(dow from day)::int=any(string_to_array(r.weekdays,',')::int[])
       on conflict(recurrence_id,event_date) do nothing
     `;
 
