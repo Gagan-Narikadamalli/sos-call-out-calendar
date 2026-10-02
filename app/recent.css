@@ -68,8 +68,7 @@
 .event.note.parent-note.recent > small::before {
   content:'Parent/Client Note'
 }
-.event.note.manager-note.recent > small::before,
-.event.note.recent > small::before {
+.event.note.manager-note.recent > small::before {
   content:'Manager Note'
 }
 
