@@ -2,6 +2,7 @@ import {NextResponse} from 'next/server';
 import {withApiErrors} from '../../../lib/api';
 import {authorized,calendarAuthorized} from '../../../lib/auth';
 import {db} from '../../../lib/db';
+import {applyParsippanyRosterMigration} from '../../../lib/parsippany-roster-migration';
 
 const kinds=new Set(['employee','client']);
 const no=()=>NextResponse.json({error:'Unauthorized'},{status:401});
@@ -27,6 +28,7 @@ async function ensureScheduleTable(sql){
     updated_at timestamptz default now()
   )`;
   await sql`create index if not exists weekly_schedules_kind_order_idx on weekly_schedules(schedule_kind,display_order,id)`;
+  await applyParsippanyRosterMigration(sql);
 }
 
 function normalizeRow(body,kind,order=0){
