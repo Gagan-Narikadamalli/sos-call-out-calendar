@@ -239,6 +239,16 @@ button:disabled {
   min-height:155px;
   padding:9px
 }
+.rolling-calendar .day.adjacent-month {
+  background:#f8fbfd
+}
+.rolling-calendar .day.today {
+  background:#f3fbfc;
+  box-shadow:inset 0 0 0 2px var(--teal)
+}
+.rolling-calendar .day.today .daytop>b {
+  color:#0d7f96
+}
 .daytop {
   display:flex;
   justify-content:space-between;
