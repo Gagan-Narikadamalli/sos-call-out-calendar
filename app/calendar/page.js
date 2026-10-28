@@ -8,6 +8,31 @@ import {apiRequest} from '../../lib/client-api';
 const LOCATION='Parsippany';
 const pad=n=>String(n).padStart(2,'0');
 const monthKey=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}`;
+const dateKey=date=>`${monthKey(date)}-${pad(date.getDate())}`;
+const addDays=(date,days)=>{
+  const next=new Date(date.getFullYear(),date.getMonth(),date.getDate(),12);
+  next.setDate(next.getDate()+days);
+  return next;
+};
+const sameMonth=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth();
+const startOfWeek=date=>addDays(date,-date.getDay());
+const viewStartFor=(month,mode)=>{
+  const today=new Date();
+  return mode==='today'&&sameMonth(month,today)
+    ?startOfWeek(today)
+    :startOfWeek(new Date(month.getFullYear(),month.getMonth(),1));
+};
+const rangeMonthKeys=(start,count=28)=>{
+  const end=addDays(start,count-1);
+  const keys=[];
+  const cursor=new Date(start.getFullYear(),start.getMonth(),1);
+  const last=new Date(end.getFullYear(),end.getMonth(),1);
+  while(cursor<=last){
+    keys.push(monthKey(cursor));
+    cursor.setMonth(cursor.getMonth()+1);
+  }
+  return keys;
+};
 
 const isNew=timestamp=>{
   const time=new Date(timestamp).getTime();
@@ -54,8 +79,7 @@ export default function TeamCalendar(){
   const [loadedMonth,setLoadedMonth]=useState('');
   const [,setClock]=useState(Date.now());
   const loadId=useRef(0);
-  const calendarRef=useRef(null);
-  const [scrollRequest,setScrollRequest]=useState({mode:'today',id:0});
+  const [viewMode,setViewMode]=useState('today');
 
   useEffect(()=>{
     apiRequest('/api/intern-login')
@@ -68,54 +92,48 @@ export default function TeamCalendar(){
 
   useEffect(()=>{
     if(authenticated)load();
-  },[authenticated,month]);
+  },[authenticated,month,viewMode]);
 
   useEffect(()=>{
     const timer=setInterval(()=>setClock(Date.now()),60000);
     return()=>clearInterval(timer);
   },[]);
 
-  useEffect(()=>{
-    const key=monthKey(month);
-    if(loadedMonth!==key||!calendarRef.current)return;
-
+  function navigatePrevious(){
     const today=new Date();
-    const viewingCurrentMonth=
-      today.getFullYear()===month.getFullYear()&&today.getMonth()===month.getMonth();
-    const targetDay=scrollRequest.mode==='today'&&viewingCurrentMonth?today.getDate():1;
+    if(viewMode==='today'&&sameMonth(month,today)){
+      setViewMode('month');
+      return;
+    }
+    setViewMode('month');
+    setMonth(current=>new Date(current.getFullYear(),current.getMonth()-1,1));
+  }
 
-    const timer=setTimeout(()=>{
-      const target=calendarRef.current?.querySelector(`[data-day="${targetDay}"]`);
-      target?.scrollIntoView({
-        behavior:scrollRequest.id===0?'auto':'smooth',
-        block:'start',
-        inline:'nearest',
-      });
-    },0);
-
-    return()=>clearTimeout(timer);
-  },[loadedMonth,month,scrollRequest]);
-
-  function navigateMonth(offset){
-    setScrollRequest(current=>({mode:'start',id:current.id+1}));
-    setMonth(current=>new Date(current.getFullYear(),current.getMonth()+offset,1));
+  function navigateNext(){
+    setViewMode('month');
+    setMonth(current=>new Date(current.getFullYear(),current.getMonth()+1,1));
   }
 
   function goToday(){
     const today=new Date();
-    setScrollRequest(current=>({mode:'today',id:current.id+1}));
+    setViewMode('today');
     setMonth(new Date(today.getFullYear(),today.getMonth(),1));
   }
 
   async function load(){
     const current=++loadId.current;
+    const key=monthKey(month);
+    const start=viewStartFor(month,viewMode);
+    const months=rangeMonthKeys(start);
     setMessage('');
     try{
-      const data=await apiRequest('/api/calendar?month='+monthKey(month));
+      const monthlyData=await Promise.all(
+        months.map(visibleMonth=>apiRequest('/api/calendar?month='+visibleMonth))
+      );
       if(current!==loadId.current)return;
-      setEntries(data.entries);
-      setNotes(data.notes);
-      setLoadedMonth(monthKey(month));
+      setEntries(monthlyData.flatMap(data=>data.entries));
+      setNotes(monthlyData.flatMap(data=>data.notes));
+      setLoadedMonth(key);
     }catch(error){
       if(current!==loadId.current)return;
       if(error.status===401)setAuthenticated(false);
@@ -166,10 +184,12 @@ export default function TeamCalendar(){
     </form></main></Shell>;
   }
 
-  const first=new Date(month.getFullYear(),month.getMonth(),1);
-  const days=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
-  const cells=[...Array(first.getDay()).fill(null),...Array.from({length:days},(_,i)=>i+1)];
-  while(cells.length%7)cells.push(null);
+  const viewStart=viewStartFor(month,viewMode);
+  const cells=Array.from({length:28},(_,index)=>{
+    const date=addDays(viewStart,index);
+    return {date,key:dateKey(date)};
+  });
+  const todayKey=dateKey(new Date());
 
   return <Shell authenticated logout={logout}>
     <main className="manager viewer">
@@ -181,12 +201,12 @@ export default function TeamCalendar(){
       {message&&<p className="message">{message}</p>}
 
       <div className="calendar-head">
-        <button onClick={()=>navigateMonth(-1)}>← Previous</button>
+        <button onClick={navigatePrevious}>← Previous</button>
         <div>
           <h1>{month.toLocaleString('en',{month:'long',year:'numeric'})}</h1>
           <button className="today-button" onClick={goToday}>Today</button>
         </div>
-        <button onClick={()=>navigateMonth(1)}>Next →</button>
+        <button onClick={navigateNext}>Next →</button>
       </div>
 
       <div className="calendar-controls">
@@ -195,11 +215,13 @@ export default function TeamCalendar(){
       </div>
 
       <div className="week">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(day=><b key={day}>{day}</b>)}</div>
-      <div className="calendar" ref={calendarRef}>
-        {cells.map((day,index)=>{
-          const date=day?`${monthKey(month)}-${pad(day)}`:'';
-          return <div className="day" data-day={day||undefined} key={index}>{day&&<>
-            <div className="daytop"><b>{day}</b></div>
+      <div className="calendar rolling-calendar">
+        {cells.map((cell,index)=>{
+          const date=cell.key;
+          const adjacent=!sameMonth(cell.date,month);
+          const isToday=date===todayKey;
+          return <div className={`day${adjacent?' adjacent-month':''}${isToday?' today':''}`} data-date={date} key={date}>
+            <div className="daytop"><b>{cell.date.getDate()===1?`${cell.date.toLocaleString('en',{month:'short'})} 1`:cell.date.getDate()}</b></div>
             {entries
               .filter(entry=>entry.event_date===date&&entry.submitter_type==='Employee'&&entryMatchesFilter(entry,activeFilter))
               .map(entry=><div className={`event ${entry.submitter_type.toLowerCase()} request${isNew(entry.submitted_at)?' recent':''}`} key={'e'+entry.id}>
@@ -216,7 +238,7 @@ export default function TeamCalendar(){
                   {note.title} — {note.note_type}
                 </div>;
               })}
-          </>}</div>;
+          </div>;
         })}
       </div>
     </main>
