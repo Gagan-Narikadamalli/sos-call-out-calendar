@@ -11,6 +11,31 @@ const LOCATION='Parsippany';
 const normalizeNoteType=value=>/^Non-PTO\s*\/\s*Out$/i.test(value||'')?'Non-PTO / Out':value;
 const pad=n=>String(n).padStart(2,'0');
 const monthKey=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}`;
+const dateKey=date=>`${monthKey(date)}-${pad(date.getDate())}`;
+const addDays=(date,days)=>{
+  const next=new Date(date.getFullYear(),date.getMonth(),date.getDate(),12);
+  next.setDate(next.getDate()+days);
+  return next;
+};
+const sameMonth=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth();
+const startOfWeek=date=>addDays(date,-date.getDay());
+const viewStartFor=(month,mode)=>{
+  const today=new Date();
+  return mode==='today'&&sameMonth(month,today)
+    ?startOfWeek(today)
+    :startOfWeek(new Date(month.getFullYear(),month.getMonth(),1));
+};
+const rangeMonthKeys=(start,count=28)=>{
+  const end=addDays(start,count-1);
+  const keys=[];
+  const cursor=new Date(start.getFullYear(),start.getMonth(),1);
+  const last=new Date(end.getFullYear(),end.getMonth(),1);
+  while(cursor<=last){
+    keys.push(monthKey(cursor));
+    cursor.setMonth(cursor.getMonth()+1);
+  }
+  return keys;
+};
 const fmt=n=>`${(Number(n)/1048576).toFixed(1)} MB`;
 
 const isNew=timestamp=>{
@@ -70,8 +95,7 @@ export default function Manager(){
   const [loadedMonth,setLoadedMonth]=useState('');
   const [,setClock]=useState(Date.now());
   const loadId=useRef(0);
-  const calendarRef=useRef(null);
-  const [scrollRequest,setScrollRequest]=useState({mode:'today',id:0});
+  const [viewMode,setViewMode]=useState('today');
 
   useEffect(()=>{
     apiRequest('/api/login')
@@ -84,57 +108,53 @@ export default function Manager(){
 
   useEffect(()=>{
     if(auth)load();
-  },[auth,month]);
+  },[auth,month,viewMode]);
 
   useEffect(()=>{
     const timer=setInterval(()=>setClock(Date.now()),60000);
     return()=>clearInterval(timer);
   },[]);
 
-  useEffect(()=>{
-    const key=monthKey(month);
-    if(loadedMonth!==key||!calendarRef.current)return;
-
+  function navigatePrevious(){
     const today=new Date();
-    const viewingCurrentMonth=
-      today.getFullYear()===month.getFullYear()&&today.getMonth()===month.getMonth();
-    const targetDay=scrollRequest.mode==='today'&&viewingCurrentMonth?today.getDate():1;
+    if(viewMode==='today'&&sameMonth(month,today)){
+      setViewMode('month');
+      return;
+    }
+    setViewMode('month');
+    setMonth(current=>new Date(current.getFullYear(),current.getMonth()-1,1));
+  }
 
-    const timer=setTimeout(()=>{
-      const target=calendarRef.current?.querySelector(`[data-day="${targetDay}"]`);
-      target?.scrollIntoView({
-        behavior:scrollRequest.id===0?'auto':'smooth',
-        block:'start',
-        inline:'nearest',
-      });
-    },0);
-
-    return()=>clearTimeout(timer);
-  },[loadedMonth,month,scrollRequest]);
-
-  function navigateMonth(offset){
-    setScrollRequest(current=>({mode:'start',id:current.id+1}));
-    setMonth(current=>new Date(current.getFullYear(),current.getMonth()+offset,1));
+  function navigateNext(){
+    setViewMode('month');
+    setMonth(current=>new Date(current.getFullYear(),current.getMonth()+1,1));
   }
 
   function goToday(){
     const today=new Date();
-    setScrollRequest(current=>({mode:'today',id:current.id+1}));
+    setViewMode('today');
     setMonth(new Date(today.getFullYear(),today.getMonth(),1));
   }
 
   async function load(){
     const current=++loadId.current;
     const key=monthKey(month);
+    const start=viewStartFor(month,viewMode);
+    const months=rangeMonthKeys(start);
     try{
-      const [entryData,noteData,storageData]=await Promise.all([
-        apiRequest('/api/manager?month='+key),
-        apiRequest('/api/notes?month='+key),
+      const [storageData,...monthlyData]=await Promise.all([
         apiRequest('/api/storage'),
+        ...months.map(async visibleMonth=>{
+          const [monthEntries,monthNotes]=await Promise.all([
+            apiRequest('/api/manager?month='+visibleMonth),
+            apiRequest('/api/notes?month='+visibleMonth),
+          ]);
+          return {entries:monthEntries,notes:monthNotes};
+        }),
       ]);
       if(current!==loadId.current)return;
-      setEntries(entryData);
-      setNotes(noteData);
+      setEntries(monthlyData.flatMap(data=>data.entries));
+      setNotes(monthlyData.flatMap(data=>data.notes));
       setLoadedMonth(key);
       setStorage(storageData);
       setMsg('');
@@ -291,10 +311,12 @@ export default function Manager(){
     </form></main></Shell>;
   }
 
-  const first=new Date(month.getFullYear(),month.getMonth(),1);
-  const days=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
-  const cells=[...Array(first.getDay()).fill(null),...Array.from({length:days},(_,i)=>i+1)];
-  while(cells.length%7)cells.push(null);
+  const viewStart=viewStartFor(month,viewMode);
+  const cells=Array.from({length:28},(_,index)=>{
+    const date=addDays(viewStart,index);
+    return {date,key:dateKey(date)};
+  });
+  const todayKey=dateKey(new Date());
 
   return <Shell authenticated logout={logout}>
     <main className="manager">
@@ -328,12 +350,12 @@ export default function Manager(){
       </div>
 
       <div className="calendar-head">
-        <button onClick={()=>navigateMonth(-1)}>← Previous</button>
+        <button onClick={navigatePrevious}>← Previous</button>
         <div>
           <h1>{month.toLocaleString('en',{month:'long',year:'numeric'})}</h1>
           <button className="today-button" onClick={goToday}>Today</button>
         </div>
-        <button onClick={()=>navigateMonth(1)}>Next →</button>
+        <button onClick={navigateNext}>Next →</button>
       </div>
 
       <div className="calendar-controls">
@@ -342,12 +364,14 @@ export default function Manager(){
       </div>
 
       <div className="week">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(day=><b key={day}>{day}</b>)}</div>
-      <div className="calendar" ref={calendarRef}>
-        {cells.map((day,index)=>{
-          const date=day?`${monthKey(month)}-${pad(day)}`:'';
-          return <div className="day" data-day={day||undefined} key={index}>{day&&<>
+      <div className="calendar rolling-calendar">
+        {cells.map((cell,index)=>{
+          const date=cell.key;
+          const adjacent=!sameMonth(cell.date,month);
+          const isToday=date===todayKey;
+          return <div className={`day${adjacent?' adjacent-month':''}${isToday?' today':''}`} data-date={date} key={date}>
             <div className="daytop">
-              <b>{day}</b>
+              <b>{cell.date.getDate()===1?`${cell.date.toLocaleString('en',{month:'short'})} 1`:cell.date.getDate()}</b>
               <button className="plus" title="Add calendar note" onClick={()=>setModal({
                 kind:'note',event_date:date,title:'',note_type:'Out',note_category:'Manager Note',details:'',
                 note_date_mode:'single',repeat_dates:[date,''],range_start:date,range_end:date,
@@ -382,7 +406,7 @@ export default function Manager(){
                   {note.title} — {note.note_type}
                 </button>;
               })}
-          </>}</div>;
+          </div>;
         })}
       </div>
     </main>
