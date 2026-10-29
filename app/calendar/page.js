@@ -22,7 +22,14 @@ const viewStartFor=(month,mode)=>{
     ?startOfWeek(today)
     :startOfWeek(new Date(month.getFullYear(),month.getMonth(),1));
 };
-const rangeMonthKeys=(start,count=35)=>{
+const viewDayCount=(month,mode)=>{
+  const today=new Date();
+  if(mode==='today'&&sameMonth(month,today))return 35;
+  const first=new Date(month.getFullYear(),month.getMonth(),1);
+  const daysInMonth=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
+  return Math.ceil((first.getDay()+daysInMonth)/7)*7;
+};
+const rangeMonthKeys=(start,count)=>{
   const end=addDays(start,count-1);
   const keys=[];
   const cursor=new Date(start.getFullYear(),start.getMonth(),1);
@@ -124,7 +131,8 @@ export default function TeamCalendar(){
     const current=++loadId.current;
     const key=monthKey(month);
     const start=viewStartFor(month,viewMode);
-    const months=rangeMonthKeys(start);
+    const dayCount=viewDayCount(month,viewMode);
+    const months=rangeMonthKeys(start,dayCount);
     setMessage('');
     try{
       const monthlyData=await Promise.all(
@@ -185,7 +193,8 @@ export default function TeamCalendar(){
   }
 
   const viewStart=viewStartFor(month,viewMode);
-  const cells=Array.from({length:35},(_,index)=>{
+  const dayCount=viewDayCount(month,viewMode);
+  const cells=Array.from({length:dayCount},(_,index)=>{
     const date=addDays(viewStart,index);
     return {date,key:dateKey(date)};
   });
