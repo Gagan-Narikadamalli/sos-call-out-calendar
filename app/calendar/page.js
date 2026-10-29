@@ -22,7 +22,7 @@ const viewStartFor=(month,mode)=>{
     ?startOfWeek(today)
     :startOfWeek(new Date(month.getFullYear(),month.getMonth(),1));
 };
-const rangeMonthKeys=(start,count=28)=>{
+const rangeMonthKeys=(start,count=35)=>{
   const end=addDays(start,count-1);
   const keys=[];
   const cursor=new Date(start.getFullYear(),start.getMonth(),1);
@@ -185,7 +185,7 @@ export default function TeamCalendar(){
   }
 
   const viewStart=viewStartFor(month,viewMode);
-  const cells=Array.from({length:28},(_,index)=>{
+  const cells=Array.from({length:35},(_,index)=>{
     const date=addDays(viewStart,index);
     return {date,key:dateKey(date)};
   });
