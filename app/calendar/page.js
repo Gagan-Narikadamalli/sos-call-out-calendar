@@ -16,19 +16,6 @@ const addDays=(date,days)=>{
 };
 const sameMonth=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth();
 const startOfWeek=date=>addDays(date,-date.getDay());
-const viewStartFor=(month,mode)=>{
-  const today=new Date();
-  return mode==='today'&&sameMonth(month,today)
-    ?startOfWeek(today)
-    :startOfWeek(new Date(month.getFullYear(),month.getMonth(),1));
-};
-const viewDayCount=(month,mode)=>{
-  const today=new Date();
-  if(mode==='today'&&sameMonth(month,today))return 35;
-  const first=new Date(month.getFullYear(),month.getMonth(),1);
-  const daysInMonth=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
-  return Math.ceil((first.getDay()+daysInMonth)/7)*7;
-};
 const rangeMonthKeys=(start,count)=>{
   const end=addDays(start,count-1);
   const keys=[];
@@ -78,7 +65,8 @@ function noteMatchesFilter(note,filter){
 export default function TeamCalendar(){
   const [authenticated,setAuthenticated]=useState(null);
   const [password,setPassword]=useState('');
-  const [month,setMonth]=useState(new Date(new Date().getFullYear(),new Date().getMonth(),1));
+  const [windowStart,setWindowStart]=useState(()=>startOfWeek(new Date()));
+  const month=new Date(windowStart.getFullYear(),windowStart.getMonth(),1);
   const [entries,setEntries]=useState([]);
   const [notes,setNotes]=useState([]);
   const [message,setMessage]=useState('');
@@ -86,7 +74,6 @@ export default function TeamCalendar(){
   const [loadedMonth,setLoadedMonth]=useState('');
   const [,setClock]=useState(Date.now());
   const loadId=useRef(0);
-  const [viewMode,setViewMode]=useState('today');
 
   useEffect(()=>{
     apiRequest('/api/intern-login')
@@ -99,7 +86,7 @@ export default function TeamCalendar(){
 
   useEffect(()=>{
     if(authenticated)load();
-  },[authenticated,month,viewMode]);
+  },[authenticated,windowStart]);
 
   useEffect(()=>{
     const timer=setInterval(()=>setClock(Date.now()),60000);
@@ -107,32 +94,21 @@ export default function TeamCalendar(){
   },[]);
 
   function navigatePrevious(){
-    const today=new Date();
-    if(viewMode==='today'&&sameMonth(month,today)){
-      setViewMode('month');
-      return;
-    }
-    setViewMode('month');
-    setMonth(current=>new Date(current.getFullYear(),current.getMonth()-1,1));
+    setWindowStart(current=>addDays(current,-35));
   }
 
   function navigateNext(){
-    setViewMode('month');
-    setMonth(current=>new Date(current.getFullYear(),current.getMonth()+1,1));
+    setWindowStart(current=>addDays(current,35));
   }
 
   function goToday(){
-    const today=new Date();
-    setViewMode('today');
-    setMonth(new Date(today.getFullYear(),today.getMonth(),1));
+    setWindowStart(startOfWeek(new Date()));
   }
 
   async function load(){
     const current=++loadId.current;
     const key=monthKey(month);
-    const start=viewStartFor(month,viewMode);
-    const dayCount=viewDayCount(month,viewMode);
-    const months=rangeMonthKeys(start,dayCount);
+    const months=rangeMonthKeys(windowStart,35);
     setMessage('');
     try{
       const monthlyData=await Promise.all(
@@ -192,13 +168,16 @@ export default function TeamCalendar(){
     </form></main></Shell>;
   }
 
-  const viewStart=viewStartFor(month,viewMode);
-  const dayCount=viewDayCount(month,viewMode);
-  const cells=Array.from({length:dayCount},(_,index)=>{
+  const viewStart=windowStart;
+  const viewEnd=addDays(viewStart,34);
+  const cells=Array.from({length:35},(_,index)=>{
     const date=addDays(viewStart,index);
     return {date,key:dateKey(date)};
   });
   const todayKey=dateKey(new Date());
+  const rangeTitle=viewStart.getFullYear()===viewEnd.getFullYear()
+    ?`${viewStart.toLocaleDateString('en',{month:'short',day:'numeric'})} – ${viewEnd.toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})}`
+    :`${viewStart.toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})} – ${viewEnd.toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})}`;
 
   return <Shell authenticated logout={logout}>
     <main className="manager viewer">
@@ -212,7 +191,7 @@ export default function TeamCalendar(){
       <div className="calendar-head">
         <button onClick={navigatePrevious}>← Previous</button>
         <div>
-          <h1>{month.toLocaleString('en',{month:'long',year:'numeric'})}</h1>
+          <h1>{rangeTitle}</h1>
           <button className="today-button" onClick={goToday}>Today</button>
         </div>
         <button onClick={navigateNext}>Next →</button>
