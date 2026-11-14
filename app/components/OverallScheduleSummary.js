@@ -7,7 +7,7 @@ import {WEEKDAYS,DAY_NAMES,parseScheduleTime,formatHours,scheduleCategory} from 
 const dayName=day=>DAY_NAMES[WEEKDAYS.indexOf(day)];
 const categoryName=row=>({bt:'BT',bcba:'BCBA',intern:'Intern',managerhr:'Manager/HR'}[scheduleCategory(row)]);
 const decimal=value=>value.toLocaleString('en-US',{maximumFractionDigits:2});
-const dateLabel=value=>{const date=String(value||'').slice(0,10);if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return date;const [year,month,day]=date.split('-');return month+'/'+day+'/'+year;};
+const dateLabel=value=>{const date=String(value||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return date;const [year,month,day]=date.split('-');return month+'/'+day+'/'+year;};
 function Shortage({value}){return <span className={`summary-badge ${value?'summary-badge-short':'summary-badge-ok'}`}>{value}</span>;}
 function SummaryTable({headers,children}){return <div className="schedule-group-table-wrap"><table className="schedule-group-table"><thead><tr>{headers.map(label=><th key={label} scope="col">{label}</th>)}</tr></thead><tbody>{children}</tbody></table></div>;}
 function CoverageSection({days,includeInterns=false}){
