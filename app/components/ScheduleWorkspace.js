@@ -338,7 +338,6 @@ function ScheduleSection({section,rows,totalCount,manager,kind,editRow,busy,dele
 function ScheduleRow({row,serialNumber,manager,editRow,busy,deleteRow,now,finalizeRow}){
   const colors=normalizeDayColors(row.day_colors);
   const isNew=isNewScheduleRow(row,now);
-  const phoneHref=String(row.phone_number||'').replace(/[^\\d+]/g,'');
   return <tr>
     <td className="schedule-serial-number">{serialNumber}</td>
     <td><span className="schedule-name-wrap"><span className="schedule-person-name">{row.first_name||'—'}</span>{isNew&&(manager?<button type="button" className="schedule-new-badge" disabled={busy} title="Click to mark this person as finalized" aria-label={`Mark ${row.first_name} as finalized`} onClick={()=>finalizeRow(row)}>NEW</button>:<span className="schedule-new-badge" title="Added within the last 7 days">NEW</span>)}</span></td>
@@ -347,7 +346,7 @@ function ScheduleRow({row,serialNumber,manager,editRow,busy,deleteRow,now,finali
     <td className="schedule-date-cell">{displayScheduleDate(row.start_date)}</td>
     <td className="schedule-date-cell">{displayScheduleDate(row.end_date)}</td>
     <td className="schedule-notes-cell"><span className="schedule-display-notes" title={row.notes||''}>{row.notes||'—'}</span></td>
-    {manager&&<><td className="schedule-contact-cell" title={row.phone_number||''}>{row.phone_number?<a href={`tel:${phoneHref}`}>{row.phone_number}</a>:'—'}</td><td className="schedule-contact-cell" title={row.email||''}>{row.email?<a href={`mailto:${row.email}`}>{row.email}</a>:'—'}</td></>}
+    {manager&&<><td className="schedule-contact-cell" title={row.phone_number||''}>{row.phone_number||'—'}</td><td className="schedule-contact-cell" title={row.email||''}>{row.email?<a href={`mailto:${row.email}`}>{row.email}</a>:'—'}</td></>}
     {manager&&<td><div className="schedule-row-actions"><button type="button" disabled={busy} onClick={()=>editRow(row)}>Edit</button><button type="button" className="danger" disabled={busy} onClick={()=>deleteRow(row)}>Delete</button></div></td>}
   </tr>;
 }
